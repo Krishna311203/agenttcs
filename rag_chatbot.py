@@ -5,6 +5,8 @@ from openai import AzureOpenAI
 from azure.search.documents import SearchClient
 from azure.search.documents.models import VectorizedQuery
 from azure.core.credentials import AzureKeyCredential
+# from azure.ai.contentsafety import ContentSafetyClient
+# from azure.ai.contentsafety.models import AnalyzeTextOptions
 
 # ============================================================
 # Load Environment Variables
@@ -21,6 +23,8 @@ EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
 SEARCH_ENDPOINT = os.getenv("SEARCH_ENDPOINT")
 SEARCH_KEY = os.getenv("SEARCH_KEY")
 INDEX_NAME = os.getenv("INDEX_NAME")
+# CONTENT_SAFETY_ENDPOINT = os.getenv("CONTENT_SAFETY_ENDPOINT")
+# CONTENT_SAFETY_KEY = os.getenv("CONTENT_SAFETY_KEY")
 
 # ============================================================
 # Validate Environment Variables
@@ -34,6 +38,8 @@ required_vars = {
     "SEARCH_ENDPOINT": SEARCH_ENDPOINT,
     "SEARCH_KEY": SEARCH_KEY,
     "INDEX_NAME": INDEX_NAME,
+    # "CONTENT_SAFETY_ENDPOINT": CONTENT_SAFETY_ENDPOINT,
+    # "CONTENT_SAFETY_KEY": CONTENT_SAFETY_KEY,
 }
 
 missing = [k for k, v in required_vars.items() if not v]
@@ -53,6 +59,11 @@ aoai_client = AzureOpenAI(
     api_version="2024-10-21"
 )
 
+
+# content_safety_client = ContentSafetyClient(
+#     endpoint=CONTENT_SAFETY_ENDPOINT,
+#     credential=AzureKeyCredential(CONTENT_SAFETY_KEY)
+# )
 # ============================================================
 # Azure AI Search Client
 # ============================================================
@@ -197,12 +208,61 @@ Question:
         ]
     )
 
-    return response.choices[0].message.content
+    answer = response.choices[0].message.content
+
+    # if not is_safe_output(answer):
+    #     return "Response blocked by Azure Content Safety."
+
+    return answer
 
 
 # ============================================================
 # Interactive Chat
 # ============================================================
+# def is_safe_input(text):
+
+#     try:
+
+#         response = content_safety_client.analyze_text(
+#             AnalyzeTextOptions(text=text)
+#         )
+
+#         for category in response.categories_analysis:
+
+#             if category.severity >= 4:
+#                 return False
+
+#         return True
+
+#     except Exception as e:
+
+#         print(f"Content Safety Error: {e}")
+#         return True
+    
+
+        
+def validate_prompt(question):
+
+    blocked_phrases = [
+        "ignore previous instructions",
+        "ignore all previous instructions",
+        "reveal system prompt",
+        "show system prompt",
+        "show hidden prompt",
+        "forget your instructions",
+        "jailbreak",
+        "hack",
+        "suicide",
+        "self-harm",
+        "murder",
+    ]
+
+    question = question.lower()
+
+    return not any(
+        phrase in question
+        for phrase in blocked_phrases
+    )
 
 def main():
 
@@ -214,6 +274,16 @@ def main():
     while True:
 
         question = input("\nYou: ").strip()
+        if not validate_prompt(question):
+
+            print("\nBot:")
+            print("Request blocked due to potential safety concerns.")
+            continue
+        
+        # if not is_safe_input(question):
+        #     print("\nBot:")
+        #     print("Request blocked by Azure Content Safety.")
+        #     continue
 
         if not question:
             continue
@@ -230,7 +300,6 @@ def main():
 
         except Exception as e:
             print(f"\nError: {str(e)}")
-
 
 if __name__ == "__main__":
     main()
