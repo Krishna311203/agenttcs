@@ -97,12 +97,13 @@ def retrieve_documents(question: str, k: int = 5):
             VectorizedQuery(
                 vector=query_vector,
                 k_nearest_neighbors=k,
-                fields="contentVector"
+                fields="text_vector"
             )
         ],
         select=[
-            "content",
-            "metadata_storage_name"
+            "chunk",
+            "title",
+            "parent_id"
         ]
     )
 
@@ -110,9 +111,9 @@ def retrieve_documents(question: str, k: int = 5):
 
     for result in results:
         documents.append({
-            "content": result.get("content", ""),
+            "content": result.get("chunk", ""),
             "source": result.get(
-                "metadata_storage_name",
+                "title",
                 "Unknown"
             )
         })
